@@ -181,6 +181,19 @@ end
     @test isapprox(expected_new_score, get_score(new_trace))
     @test isapprox(expected_weight, weight)
     @test retdiff === UnknownChange()
+
+    # Test correct discarding for hierarchical choicemap update 
+    @gen function hierarchical_update()
+        k ~ poisson(5)
+        for i=1:k
+            {:value => i} ~ uniform(0,1)
+        end
+    end
+    tr, = Gen.generate(hierarchical_update, (), choicemap(:k=>3));
+    # update k, affecting the number of children
+    (new_trace, weight, _, discard) = Gen.update(tr, Gen.choicemap(:k=>1));
+    @test Gen.has_value(discard, :value => 2)
+    @test Gen.has_value(discard, :value => 3)
 end
 
 @testset "regenerate" begin
@@ -521,16 +534,24 @@ end
 
 @testset "docstrings" begin
 
+    function doc_to_str(doc)
+        if doc isa Base.Docs.DocStr
+            # Handle @doc behavior in Julia 1.11 when REPL is not loaded
+            return doc.text[1]
+        else
+            # Handle pre-Julia 1.11 behavior of @doc
+            return string(doc)
+        end
+    end
+        
     """
     my documentation
     """
     @gen function foo(x)
             return x + 1
-        end
+    end
 
-    io = IOBuffer()
-    print(io, @doc foo)
-    @test String(take!(io)) == "my documentation\n"
+    @test doc_to_str(@doc(foo)) == "my documentation\n"
 
 end
 

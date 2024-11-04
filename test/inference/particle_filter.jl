@@ -96,8 +96,8 @@ end
 @testset "custom proposal" begin
 
     Random.seed!(1)
-    num_particles = 10000
-    ess_threshold = 10000 # make sure we exercise resampling
+    num_particles = 20000
+    ess_threshold = 20000 # make sure we exercise resampling
 
     # initialize particle filter
 
@@ -146,8 +146,8 @@ end
 @testset "default proposal" begin
 
     Random.seed!(1)
-    num_particles = 10000
-    ess_threshold = 10000 # make sure we exercise resampling
+    num_particles = 20000
+    ess_threshold = 20000 # make sure we exercise resampling
 
     # initialize the particle filter
     init_observations = choicemap((:x_init, obs_x[1]))
@@ -169,4 +169,31 @@ end
     @test isapprox(expected_log_ml, actual_log_ml_est, atol=0.02)
 end
 
+@testset "PF state" begin
+    @gen function _foo()
+        x ~ normal(0, 1)
+    end
+    st = Gen.ParticleFilterState{Gen.Trace}(
+        [simulate(_foo, ()) for _=1:10],
+        Vector{Gen.Trace}(undef, 10),
+        [0. for _=1:10],
+        0.,
+        collect(1:10)
+    )
+    st2 = copy(st)
+    @test st == st2
+    @test hash(st) == hash(st2)
+    st2.log_weights[1] = 1.
+    @test st.log_weights[1] == 0.
+    @test st != st2
+    @test hash(st) != hash(st2)
+
+    # test that the other fields are independent copies too:
+    st.traces[1] = simulate(_foo, ())
+    @test st.traces != st2.traces
+    st.log_ml_est = 1.
+    @test st.log_ml_est == 1.
+    st.parents[1] = 5
+    @test st2.parents[1] == 1
+end
 end

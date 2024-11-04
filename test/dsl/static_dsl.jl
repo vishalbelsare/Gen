@@ -558,9 +558,16 @@ trace, = generate(foo, (), constraints)
 end
 
 @testset "docstrings" begin
-    io = IOBuffer()
-    print(io, @doc model)
-    @test String(take!(io)) == "my documentation\n"
+    function doc_to_str(doc)
+        if doc isa Base.Docs.DocStr
+            # Handle @doc behavior in Julia 1.11 when REPL is not loaded
+            return doc.text[1]
+        else
+            # Handle pre-Julia 1.11 behavior of @doc
+            return string(doc)
+        end
+    end
+    @test doc_to_str(@doc(model)) == "my documentation\n"
 end
 
 @testset "one-line definitions" begin
@@ -608,6 +615,18 @@ ch = get_choices(tr)
 @test get_submap(ch, :y) == EmptyChoiceMap()
 @test length(get_values_shallow(ch)) == 1
 @test length(get_submaps_shallow(ch)) == 1
+
+@gen (static) function baz(trace)
+    x ~ normal(trace[:x], 0.1)
+    return x
+end
+
+ch, w, rval = propose(baz, (tr,))
+@test has_value(ch, :x)
+@test ch[:x] == rval
+
+new_tr, _ = generate(bar1, (), ch)
+@test new_tr[:x] == ch[:x]
 
 end
 

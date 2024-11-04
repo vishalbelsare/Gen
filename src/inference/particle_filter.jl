@@ -12,15 +12,54 @@ function normalize_weights(log_weights::Vector{Float64})
 end
 
 #######################################
-# building blocks for particle filter #
+# building blocks for particle filters #
 #######################################
 
+"""
+    ParticleFilterState{U}
+
+Represents the state of a particle filter as a collection of weighted traces,
+where the type of each trace is `U`.
+
+# Fields
+
+- `traces`: A vector of traces, one for each particle.
+- `new_traces`: A preallocated vector for storing new traces.
+- `log_weights`: A vector of log importance weights for each trace.
+- `log_ml_est`: Estimate of the log marginal likelihood before the last resampling step.
+- `parents`: The parent indices of each trace in `traces`.
+
+!!! note
+    The fields above are an implementation detail that are subject to future changes.
+"""
 mutable struct ParticleFilterState{U}
     traces::Vector{U}
     new_traces::Vector{U}
     log_weights::Vector{Float64}
     log_ml_est::Float64
     parents::Vector{Int}
+end
+
+function Base.copy(state::ParticleFilterState{U}) where U
+    return ParticleFilterState{U}(
+        Base.copy(state.traces),
+        Base.copy(state.new_traces),
+        Base.copy(state.log_weights),
+        state.log_ml_est,
+        Base.copy(state.parents)
+    )
+end
+function Base.:(==)(a::ParticleFilterState{U}, b::ParticleFilterState{V}) where {U, V}
+    return U == V &&
+        a.traces == b.traces &&
+        a.log_weights == b.log_weights &&
+        a.log_ml_est == b.log_ml_est &&
+        a.parents == b.parents
+end
+function Base.hash(state::ParticleFilterState{U}, h::UInt) where {U}
+    return hash(U, hash(state.traces,
+                        hash(state.log_weights,
+                             hash(state.log_ml_est, hash(state.parents, h)))))
 end
 
 """
@@ -235,5 +274,6 @@ function maybe_resample!(
     return do_resample
 end
 
+export ParticleFilterState
 export initialize_particle_filter, particle_filter_step!, maybe_resample!
 export get_traces, get_log_weights, log_ml_estimate, sample_unweighted_traces
